@@ -41,7 +41,6 @@ class GuitarTunerApp {
       modeGuitarBtn: document.getElementById('modeGuitarBtn'),
       modeChromaticBtn: document.getElementById('modeChromaticBtn'),
       micToggleBtn: document.getElementById('micToggleBtn'),
-      micBtnText: document.getElementById('micBtnText'),
       statusBanner: document.getElementById('statusBanner'),
       
       // Hero Note Display
@@ -715,7 +714,8 @@ class GuitarTunerApp {
       this.audioController.stopListening();
       this.isListening = false;
       this.dom.micToggleBtn.classList.remove('recording');
-      this.dom.micBtnText.textContent = 'Turn Tuner On';
+      this.dom.micToggleBtn.title = 'Turn Tuner On (Spacebar)';
+      this.dom.micToggleBtn.setAttribute('aria-label', 'Turn Tuner On (Spacebar)');
       this.dom.tuningStatusTag.className = 'tuning-status-tag idle';
       this.dom.tuningStatusTag.textContent = 'Microphone Off';
       this.dom.signalLevelText.textContent = 'Inactive';
@@ -727,7 +727,8 @@ class GuitarTunerApp {
         this.pitchDetector.setSampleRate(this.audioController.getSampleRate());
         this.isListening = true;
         this.dom.micToggleBtn.classList.add('recording');
-        this.dom.micBtnText.textContent = 'Turn Tuner Off';
+        this.dom.micToggleBtn.title = 'Turn Tuner Off (Spacebar)';
+        this.dom.micToggleBtn.setAttribute('aria-label', 'Turn Tuner Off (Spacebar)');
         this.dom.tuningStatusTag.className = 'tuning-status-tag listening';
         this.dom.tuningStatusTag.textContent = 'Listening... Play a string';
         this.dom.signalLevelText.textContent = 'Active (Listening)';

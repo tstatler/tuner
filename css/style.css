@@ -230,6 +230,16 @@ body {
   animation: pulse-recording 2s infinite ease-in-out;
 }
 
+.mic-btn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 @keyframes pulse-recording {
   0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.6); }
   70% { box-shadow: 0 0 0 10px rgba(244, 63, 94, 0); }
