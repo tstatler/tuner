@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guitar Tuner - Precision Web Audio Tuner</title>
+  <meta name="description" content="Accurate, real-time guitar and chromatic instrument tuner with tone generator and alternate tunings using Web Audio API.">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22%20width=%22100%22%20height=%22100%22><text y=%22.9em%22 font-size=%2290%22>🎸</text></svg>">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Header -->
+    <header class="app-header">
+      <div class="logo-group">
+        <span class="logo-icon" aria-hidden="true">🎸</span>
+        <div>
+          <h1 class="logo-title">Guitar Tuner</h1>
+          <span class="logo-subtitle">Precision Audio Tuner</span>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <!-- Tuning Selector -->
+        <div class="control-group">
+          <label for="tuningSelect" class="control-label">Tuning</label>
+          <select id="tuningSelect" class="custom-select" aria-label="Select instrument tuning"></select>
+        </div>
+
+        <!-- Mode Toggle (Guitar vs Chromatic) -->
+        <div class="mode-toggle-group" role="radiogroup" aria-label="Tuning Mode">
+          <button id="modeGuitarBtn" class="mode-btn active" role="radio" aria-checked="true" data-mode="guitar">Guitar</button>
+          <button id="modeChromaticBtn" class="mode-btn" role="radio" aria-checked="false" data-mode="chromatic">Chromatic</button>
+        </div>
+
+        <!-- Settings Button -->
+        <button id="openSettingsBtn" class="icon-btn" aria-label="Open Tuner Settings" title="Settings (Calibration & Audio)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+
+        <!-- Mic Action Button -->
+        <button id="micToggleBtn" class="primary-btn mic-btn" aria-label="Toggle Microphone Tuner">
+          <svg class="mic-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="23"></line>
+            <line x1="8" y1="23" x2="16" y2="23"></line>
+          </svg>
+          <span id="micBtnText">Turn Tuner On</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="tuner-main">
+      <!-- Status Banner / Permission Notice -->
+      <div id="statusBanner" class="status-banner hidden" role="alert"></div>
+
+      <!-- Center Meter Display Section -->
+      <section class="display-card" aria-label="Tuning readout">
+        <!-- Big Note Indicator -->
+        <div class="note-hero">
+          <div class="note-symbol-wrapper">
+            <span id="detectedNote" class="detected-note">--</span>
+            <span id="detectedOctave" class="detected-octave"></span>
+          </div>
+          <div id="tuningStatusTag" class="tuning-status-tag idle">Microphone Off</div>
+        </div>
+
+        <!-- Needle / Arc Gauge Canvas -->
+        <div class="gauge-container">
+          <canvas id="gaugeCanvas" width="400" height="230"></canvas>
+        </div>
+
+        <!-- Frequency & Cents Telemetry -->
+        <div class="telemetry-bar">
+          <div class="telemetry-item">
+            <span class="telemetry-label">Pitch</span>
+            <span id="detectedFreq" class="telemetry-value">-- Hz</span>
+          </div>
+          <div class="telemetry-item target-item">
+            <span class="telemetry-label">Target</span>
+            <span id="targetFreq" class="telemetry-value">-- Hz</span>
+          </div>
+          <div class="telemetry-item">
+            <span class="telemetry-label">Cents</span>
+            <span id="centsOffset" class="telemetry-value">0</span>
+          </div>
+          <div class="telemetry-item">
+            <span class="telemetry-label">Standard</span>
+            <span id="telemetryA4" class="telemetry-value">440 Hz</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Interactive Strings Section -->
+      <section class="strings-section" aria-label="Instrument Strings">
+        <div class="strings-header">
+          <div class="strings-header-info">
+            <h2 class="strings-title">Strings</h2>
+            <span id="stringsSubtitle" class="strings-subtitle">Click a string to hear reference tone or lock target</span>
+          </div>
+          <button id="autoDetectStringBtn" class="chip-btn active" title="Automatically track string based on detected pitch">Auto String Track</button>
+        </div>
+
+        <!-- String cards dynamically rendered here -->
+        <div id="stringsContainer" class="strings-grid"></div>
+      </section>
+
+      <!-- Reference Tone Generator Quick Bar -->
+      <section class="tone-bar-section" aria-label="Reference Tone Generator">
+        <div class="tone-bar-card">
+          <div class="tone-bar-title-wrap">
+            <span class="tone-icon">🔊</span>
+            <span class="tone-title">Reference Tone Generator</span>
+          </div>
+          <div class="tone-bar-controls">
+            <div class="tone-control-item">
+              <label for="toneTimbreSelect" class="subtle-label">Timbre:</label>
+              <select id="toneTimbreSelect" class="custom-select compact">
+                <option value="acoustic" selected>Acoustic Pluck</option>
+                <option value="pure">Pure Sine</option>
+              </select>
+            </div>
+            <div class="tone-control-item">
+              <label for="toneNoteSelect" class="subtle-label">Note:</label>
+              <select id="toneNoteSelect" class="custom-select compact"></select>
+            </div>
+            <button id="playToneBtn" class="secondary-btn tone-play-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              <span>Play Tone</span>
+            </button>
+            <button id="stopToneBtn" class="secondary-btn tone-stop-btn hidden">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="6" width="12" height="12"></rect>
+              </svg>
+              <span>Stop</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bottom Audio Signal Visualizer -->
+      <section class="visualizer-section" aria-label="Microphone Signal Waveform">
+        <div class="visualizer-header">
+          <span class="visualizer-label">Signal Visualizer</span>
+          <span id="signalLevelText" class="visualizer-subtext">Inactive</span>
+        </div>
+        <div class="visualizer-container">
+          <canvas id="waveformCanvas" width="600" height="48"></canvas>
+        </div>
+      </section>
+    </main>
+
+    <!-- Settings Dialog -->
+    <dialog id="settingsDialog" class="settings-dialog" aria-labelledby="settingsHeading">
+      <div class="dialog-header">
+        <h2 id="settingsHeading" class="dialog-title">Tuner Settings</h2>
+        <button id="closeSettingsBtn" class="icon-btn close-btn" aria-label="Close Settings">✕</button>
+      </div>
+
+      <div class="dialog-body">
+        <!-- A4 Calibration -->
+        <div class="settings-group">
+          <div class="settings-group-header">
+            <label for="a4Slider" class="settings-label">A4 Calibration</label>
+            <span id="a4ValueLabel" class="settings-val-badge">440 Hz</span>
+          </div>
+          <p class="settings-description">Standard concert pitch is 440 Hz. Adjust if playing with alternative concert tuning (e.g. 432 Hz baroque or 442 Hz orchestral).</p>
+          <input type="range" id="a4Slider" min="415" max="466" step="1" value="440" class="custom-slider">
+          <div class="preset-pills">
+            <button class="pill-btn" data-a4="432">432 Hz</button>
+            <button class="pill-btn active" data-a4="440">440 Hz (Standard)</button>
+            <button class="pill-btn" data-a4="442">442 Hz</button>
+          </div>
+        </div>
+
+        <!-- Noise Gate / Mic Sensitivity -->
+        <div class="settings-group">
+          <div class="settings-group-header">
+            <label for="sensitivitySlider" class="settings-label">Microphone Sensitivity / Noise Gate</label>
+            <span id="sensitivityValueLabel" class="settings-val-badge">Normal</span>
+          </div>
+          <p class="settings-description">Lower threshold detects quieter string sustains; raise threshold in noisy environments to filter background sounds.</p>
+          <input type="range" id="sensitivitySlider" min="1" max="5" step="1" value="3" class="custom-slider">
+          <div class="slider-marks">
+            <span>High Sensitivity</span>
+            <span>Normal</span>
+            <span>High Noise Filter</span>
+          </div>
+        </div>
+
+        <!-- Input Device Selection -->
+        <div class="settings-group">
+          <label for="audioDeviceSelect" class="settings-label">Microphone Input Device</label>
+          <p class="settings-description">Select your audio interface, USB pickup, or internal microphone.</p>
+          <select id="audioDeviceSelect" class="custom-select full-width"></select>
+        </div>
+      </div>
+
+      <div class="dialog-footer">
+        <button id="saveSettingsBtn" class="primary-btn">Done</button>
+      </div>
+    </dialog>
+  </div>
+
+  <!-- Scripts as modern ES modules -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
