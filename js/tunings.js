@@ -227,6 +227,82 @@ export function getAllTunings() {
 }
 
 /**
+ * Parses a copied/pasted tuning string into string objects.
+ * Interprets the sequence from top string (lowest pitch) to bottom string (highest pitch).
+ * Supports formats like:
+ * - "DADGAD", "EADGBE", "CGCFAD"
+ * - "D A D G A D", "D-A-D-G-B-E", "D/A/D/G/B/E"
+ * - "D A D F# A D", "Eb Ab Db Gb Bb Eb"
+ * - "D2 A2 D3 G3 B3 E4"
+ * - "Tuning: D A D G B E"
+ */
+export function parseTuningString(input) {
+  if (!input || typeof input !== 'string') return null;
+
+  let text = input.trim();
+  // Strip common label prefixes like "Tuning:" or "Guitar:"
+  if (text.includes(':')) {
+    text = text.split(':').pop();
+  }
+  text = text.replace(/\b(tuning|guitar|open|drop|standard)\b/gi, '').trim();
+
+  // Match musical notes (A-G, optional # or b, optional octave number 0-9)
+  const regex = /([A-Ga-g][#b]?)([0-9]?)/g;
+  const matches = [];
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    matches.push({ rawNote: match[1], rawOct: match[2] });
+  }
+
+  if (matches.length < 3 || matches.length > 12) {
+    return null;
+  }
+
+  const flatMap = {
+    'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#',
+    'db': 'C#', 'eb': 'D#', 'gb': 'F#', 'ab': 'G#', 'bb': 'A#'
+  };
+
+  const totalStrings = matches.length;
+  const resultStrings = [];
+  let prevMidi = -1;
+
+  for (let i = 0; i < totalStrings; i++) {
+    const item = matches[i];
+    let normNote = item.rawNote.charAt(0).toUpperCase() + item.rawNote.slice(1).toLowerCase();
+    const sharpNote = flatMap[normNote] || normNote;
+
+    let octave = item.rawOct ? parseInt(item.rawOct, 10) : null;
+
+    if (octave === null) {
+      if (i === 0) {
+        // Lowest string: default Octave 2 for 6-8 string guitar, Octave 1 if 4-string bass
+        octave = (totalStrings <= 4 && (sharpNote === 'E' || sharpNote === 'B')) ? 1 : 2;
+      } else {
+        // Increment octave so pitch ascends monotonically from low string to high string
+        octave = 2;
+        while (octave <= 6 && getMidiNumber(sharpNote, octave) <= prevMidi) {
+          octave++;
+        }
+      }
+    }
+
+    const midi = getMidiNumber(sharpNote, octave);
+    prevMidi = midi;
+    const stringNum = totalStrings - i;
+
+    resultStrings.push({
+      num: stringNum,
+      note: sharpNote,
+      octave,
+      name: `${normNote}${octave}`
+    });
+  }
+
+  return resultStrings;
+}
+
+/**
  * Returns MIDI note number for note name and octave (e.g. 'A', 4 -> 69)
  */
 export function getMidiNumber(noteName, octave) {

@@ -911,6 +911,72 @@ body {
   max-width: 520px;
 }
 
+/* Quick Paste Group */
+.quick-paste-group {
+  background: rgba(56, 189, 248, 0.05);
+  border: 1px dashed rgba(56, 189, 248, 0.25);
+  border-radius: var(--radius-md);
+  padding: 0.85rem;
+}
+
+.paste-input-wrapper {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.paste-input {
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  letter-spacing: 0.05em;
+}
+
+.apply-paste-btn {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.apply-paste-btn:hover {
+  background: var(--accent-cyan);
+  color: #0b0f17;
+}
+
+.subtle-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--accent-cyan);
+  background: rgba(56, 189, 248, 0.12);
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-sm);
+}
+
+.paste-feedback {
+  font-size: 0.78rem;
+  font-weight: 500;
+  margin-top: 0.4rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.paste-feedback.success {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+.paste-feedback.error {
+  background: rgba(244, 63, 94, 0.15);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  color: #fb7185;
+}
+
 .custom-input {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);

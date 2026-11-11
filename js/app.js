@@ -13,7 +13,8 @@ import {
   loadCustomTunings,
   saveCustomTuning,
   deleteCustomTuning,
-  getAllTunings
+  getAllTunings,
+  parseTuningString
 } from './tunings.js';
 import { PitchDetector } from './pitch-detector.js';
 import { AudioController } from './audio-controller.js';
@@ -91,6 +92,9 @@ class GuitarTunerApp {
       customTuningDialog: document.getElementById('customTuningDialog'),
       customTuningForm: document.getElementById('customTuningForm'),
       customTuningName: document.getElementById('customTuningName'),
+      customTuningPasteInput: document.getElementById('customTuningPasteInput'),
+      applyPastedTuningBtn: document.getElementById('applyPastedTuningBtn'),
+      pasteFeedbackMsg: document.getElementById('pasteFeedbackMsg'),
       customTuningTemplate: document.getElementById('customTuningTemplate'),
       customStringCount: document.getElementById('customStringCount'),
       customStringsEditor: document.getElementById('customStringsEditor'),
@@ -177,6 +181,10 @@ class GuitarTunerApp {
 
     // Default field values
     this.dom.customTuningName.value = '';
+    this.dom.customTuningPasteInput.value = '';
+    this.dom.pasteFeedbackMsg.className = 'paste-feedback hidden';
+    this.dom.pasteFeedbackMsg.textContent = '';
+
     const currentLen = this.currentTuning.strings.length;
     this.dom.customStringCount.value = [4, 5, 6, 7, 8].includes(currentLen) ? currentLen.toString() : '6';
 
@@ -184,7 +192,42 @@ class GuitarTunerApp {
     this.renderCustomStringsEditor(this.currentTuning.strings);
 
     this.dom.customTuningDialog.showModal();
-    this.dom.customTuningName.focus();
+    this.dom.customTuningPasteInput.focus();
+  }
+
+  handlePasteTuningString(rawText = null) {
+    const text = (rawText !== null ? rawText : this.dom.customTuningPasteInput.value).trim();
+    if (!text) {
+      this.dom.pasteFeedbackMsg.className = 'paste-feedback error';
+      this.dom.pasteFeedbackMsg.textContent = 'Please enter or paste a tuning string (e.g. DADGAD or D A D G B E)';
+      return;
+    }
+
+    const parsed = parseTuningString(text);
+    if (!parsed || parsed.length === 0) {
+      this.dom.pasteFeedbackMsg.className = 'paste-feedback error';
+      this.dom.pasteFeedbackMsg.textContent = `Could not recognize notes in "${text}". Try e.g. DADGAD, D A D G B E, or CGCFAD`;
+      return;
+    }
+
+    const count = parsed.length;
+    if ([4, 5, 6, 7, 8].includes(count)) {
+      this.dom.customStringCount.value = count.toString();
+    }
+
+    // Render editor rows with parsed notes and octaves (low to high)
+    this.renderCustomStringsEditor(parsed);
+
+    // Auto-suggest tuning name
+    const currentName = this.dom.customTuningName.value.trim();
+    const noteSequence = parsed.map(s => s.name.replace(/[0-9]/g, '')).join(' ');
+    if (!currentName || currentName.startsWith('Custom:')) {
+      this.dom.customTuningName.value = `Custom: ${noteSequence}`;
+    }
+
+    const noteOctSummary = parsed.map(s => s.name).join(' ');
+    this.dom.pasteFeedbackMsg.className = 'paste-feedback success';
+    this.dom.pasteFeedbackMsg.textContent = `✓ Interpreted ${count} strings: ${noteOctSummary} (Low to High)`;
   }
 
   renderCustomStringsEditor(sourceStrings) {
@@ -437,6 +480,24 @@ class GuitarTunerApp {
 
     this.dom.cancelCustomTuningBtn.addEventListener('click', () => {
       this.dom.customTuningDialog.close();
+    });
+
+    // Quick Paste Event Handlers
+    this.dom.applyPastedTuningBtn.addEventListener('click', () => {
+      this.handlePasteTuningString();
+    });
+
+    this.dom.customTuningPasteInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.handlePasteTuningString();
+      }
+    });
+
+    this.dom.customTuningPasteInput.addEventListener('paste', () => {
+      setTimeout(() => {
+        this.handlePasteTuningString();
+      }, 25);
     });
 
     // Custom Tuning Template Preset Change

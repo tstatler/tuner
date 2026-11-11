@@ -231,6 +231,20 @@
 
       <form id="customTuningForm">
         <div class="dialog-body">
+          <!-- Quick Paste Section -->
+          <div class="settings-group quick-paste-group">
+            <div class="settings-group-header">
+              <label for="customTuningPasteInput" class="settings-label">Quick Paste Tuning String</label>
+              <span class="subtle-badge">Auto-Detect</span>
+            </div>
+            <p class="settings-description">Paste notes from top string (low) to bottom string (high). Supports spaces, hyphens, or continuous letters (e.g. <code>DADGAD</code>, <code>D A D G B E</code>, <code>CGCFAD</code>, or <code>D-A-D-F#-A-D</code>).</p>
+            <div class="paste-input-wrapper">
+              <input type="text" id="customTuningPasteInput" class="custom-input paste-input" placeholder="Paste e.g. DADGAD or D A D G B E" autocomplete="off">
+              <button type="button" id="applyPastedTuningBtn" class="secondary-btn apply-paste-btn">Apply</button>
+            </div>
+            <div id="pasteFeedbackMsg" class="paste-feedback hidden" role="status"></div>
+          </div>
+
           <div class="settings-group">
             <label for="customTuningName" class="settings-label">Tuning Name</label>
             <input type="text" id="customTuningName" class="custom-input" placeholder="e.g. Open C (C G C G C E)" required autocomplete="off">
