@@ -127,14 +127,19 @@ export class AudioController {
 
   /**
    * Reference Tone Synthesizer
-   * Creates a warm acoustic string-like timbre with fundamental and gentle harmonics
+   * Creates a warm acoustic string-like timbre or pure sine wave with smooth ADSR envelope.
    */
   async playReferenceTone(frequency, type = 'acoustic', duration = 3.0) {
+    if (!frequency || isNaN(frequency) || frequency <= 0) return;
+
     await this.initAudioContext();
     this.stopReferenceTone();
 
-    const now = this.audioContext.currentTime;
+    // Schedule slightly in advance to guarantee all nodes receive events cleanly
+    const now = this.audioContext.currentTime + 0.02;
+
     const masterGain = this.audioContext.createGain();
+    // Start at silence
     masterGain.gain.setValueAtTime(0.0001, now);
     masterGain.connect(this.audioContext.destination);
 
@@ -149,20 +154,21 @@ export class AudioController {
       osc.start(now);
       oscillators.push(osc);
 
-      // Quick attack and smooth sustain/decay
-      masterGain.gain.exponentialRampToValueAtTime(0.3, now + 0.05);
+      // Volume envelope (peak 0.45)
+      masterGain.gain.linearRampToValueAtTime(0.45, now + 0.05);
       if (duration > 0) {
-        masterGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-        osc.stop(now + duration + 0.1);
+        masterGain.gain.setValueAtTime(0.45, now + duration - 0.2);
+        masterGain.gain.linearRampToValueAtTime(0.0001, now + duration);
+        osc.stop(now + duration + 0.05);
       }
     } else {
       // Acoustic string pluck simulation:
-      // Fundamental + 2nd Harmonic + 3rd Harmonic with progressive decay
+      // Fundamental + 2nd, 3rd, 4th harmonics for a warm guitar timbre
       const harmonics = [
-        { mult: 1, gain: 0.35, wave: 'triangle' },
-        { mult: 2, gain: 0.15, wave: 'sine' },
-        { mult: 3, gain: 0.08, wave: 'sine' },
-        { mult: 4, gain: 0.03, wave: 'sine' },
+        { mult: 1, gain: 0.50, wave: 'triangle' },
+        { mult: 2, gain: 0.25, wave: 'sine' },
+        { mult: 3, gain: 0.12, wave: 'sine' },
+        { mult: 4, gain: 0.06, wave: 'sine' }
       ];
 
       for (const h of harmonics) {
@@ -179,12 +185,18 @@ export class AudioController {
         oscillators.push(osc);
       }
 
-      // Pluck envelope: quick 20ms attack, then natural guitar string exponential decay
-      masterGain.gain.linearRampToValueAtTime(0.4, now + 0.02);
+      // Pluck attack (25ms) to clear, audible peak volume (0.55),
+      // then decay gently mimicking a ringing acoustic guitar string
+      masterGain.gain.linearRampToValueAtTime(0.55, now + 0.025);
       if (duration > 0) {
-        masterGain.gain.exponentialRampToValueAtTime(0.12, now + 0.8);
-        masterGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-        oscillators.forEach(osc => osc.stop(now + duration + 0.1));
+        masterGain.gain.linearRampToValueAtTime(0.25, now + 0.6);
+        masterGain.gain.linearRampToValueAtTime(0.12, now + 1.8);
+        masterGain.gain.linearRampToValueAtTime(0.0001, now + duration);
+        oscillators.forEach(osc => {
+          try {
+            osc.stop(now + duration + 0.05);
+          } catch (e) {}
+        });
       }
     }
 
@@ -192,33 +204,51 @@ export class AudioController {
     this.activeGainNodes = [masterGain];
 
     if (duration > 0) {
-      setTimeout(() => {
-        this.activeOscillators = [];
-        this.activeGainNodes = [];
+      const cleanupTimer = setTimeout(() => {
+        if (this.activeOscillators === oscillators) {
+          this.activeOscillators = [];
+          this.activeGainNodes = [];
+        }
       }, (duration + 0.2) * 1000);
+      this.currentToneTimer = cleanupTimer;
     }
   }
 
   stopReferenceTone() {
-    if (!this.audioContext) return;
+    if (this.currentToneTimer) {
+      clearTimeout(this.currentToneTimer);
+      this.currentToneTimer = null;
+    }
+
+    if (!this.audioContext || this.activeOscillators.length === 0) {
+      return;
+    }
+
     const now = this.audioContext.currentTime;
-    for (const gain of this.activeGainNodes) {
+    const oldGains = [...this.activeGainNodes];
+    const oldOscs = [...this.activeOscillators];
+    
+    // Clear references immediately so subsequent calls won't stop newly started tones
+    this.activeGainNodes = [];
+    this.activeOscillators = [];
+
+    // Smooth quick fade-out of old sounds to avoid any audible pop/click
+    for (const gain of oldGains) {
       try {
         gain.gain.cancelScheduledValues(now);
-        gain.gain.setValueAtTime(gain.gain.value, now);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+        gain.gain.setValueAtTime(Math.max(0.0001, gain.gain.value), now);
+        gain.gain.linearRampToValueAtTime(0.0001, now + 0.03);
       } catch (e) {}
     }
+
     setTimeout(() => {
-      for (const osc of this.activeOscillators) {
+      for (const osc of oldOscs) {
         try {
           osc.stop();
           osc.disconnect();
         } catch (e) {}
       }
-      this.activeOscillators = [];
-      this.activeGainNodes = [];
-    }, 60);
+    }, 40);
   }
 
   async getAudioInputDevices() {

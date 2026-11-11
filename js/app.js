@@ -207,13 +207,17 @@ class GuitarTunerApp {
     });
   }
 
-  playStringReferenceTone(stringObj, frequency, cardEl) {
+  async playStringReferenceTone(stringObj, frequency, cardEl) {
     const timbre = this.dom.toneTimbreSelect.value;
-    this.audioController.playReferenceTone(frequency, timbre, 2.5);
     cardEl.classList.add('playing');
+    try {
+      await this.audioController.playReferenceTone(frequency, timbre, 3.0);
+    } catch (err) {
+      console.error('Error playing string tone:', err);
+    }
     setTimeout(() => {
       cardEl.classList.remove('playing');
-    }, 2500);
+    }, 3000);
   }
 
   bindEvents() {
@@ -244,23 +248,41 @@ class GuitarTunerApp {
     this.dom.micToggleBtn.addEventListener('click', () => this.toggleMicrophone());
 
     // Tone Generator Play / Stop
-    this.dom.playToneBtn.addEventListener('click', () => {
-      const [note, octStr] = this.dom.toneNoteSelect.value.split('_');
-      const octave = parseInt(octStr, 10);
-      const freq = getFrequency(note, octave, this.a4Frequency);
-      const timbre = this.dom.toneTimbreSelect.value;
+    this.dom.playToneBtn.addEventListener('click', async () => {
+      try {
+        const val = this.dom.toneNoteSelect.value;
+        if (!val) return;
+        const [note, octStr] = val.split('_');
+        const octave = parseInt(octStr, 10);
+        const freq = getFrequency(note, octave, this.a4Frequency);
+        const timbre = this.dom.toneTimbreSelect.value;
 
-      this.audioController.playReferenceTone(freq, timbre, 4.0);
-      this.dom.playToneBtn.classList.add('hidden');
-      this.dom.stopToneBtn.classList.remove('hidden');
+        if (this.toneBtnTimeout) {
+          clearTimeout(this.toneBtnTimeout);
+        }
 
-      setTimeout(() => {
+        this.dom.playToneBtn.classList.add('hidden');
+        this.dom.stopToneBtn.classList.remove('hidden');
+
+        await this.audioController.playReferenceTone(freq, timbre, 3.5);
+
+        this.toneBtnTimeout = setTimeout(() => {
+          this.dom.playToneBtn.classList.remove('hidden');
+          this.dom.stopToneBtn.classList.add('hidden');
+          this.toneBtnTimeout = null;
+        }, 3500);
+      } catch (err) {
+        console.error('Error playing reference tone:', err);
         this.dom.playToneBtn.classList.remove('hidden');
         this.dom.stopToneBtn.classList.add('hidden');
-      }, 4000);
+      }
     });
 
     this.dom.stopToneBtn.addEventListener('click', () => {
+      if (this.toneBtnTimeout) {
+        clearTimeout(this.toneBtnTimeout);
+        this.toneBtnTimeout = null;
+      }
       this.audioController.stopReferenceTone();
       this.dom.playToneBtn.classList.remove('hidden');
       this.dom.stopToneBtn.classList.add('hidden');
