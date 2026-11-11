@@ -378,6 +378,9 @@ class GuitarTunerApp {
       const card = document.createElement('div');
       card.className = 'string-card';
       card.dataset.stringIndex = index;
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('role', 'button');
+      card.setAttribute('aria-label', `String ${str.num}: ${str.name || str.note}, ${freq.toFixed(1)} Hz. Press Enter to lock string.`);
       if (this.selectedStringIndex === index) {
         card.classList.add('selected');
       }
@@ -386,7 +389,7 @@ class GuitarTunerApp {
         <span class="string-num-badge">${str.num}</span>
         <span class="string-note-name">${str.name || str.note}</span>
         <span class="string-target-freq">${freq.toFixed(1)} Hz</span>
-        <button class="string-listen-btn" title="Hear ${str.name || str.note} reference tone" aria-label="Play reference pitch for string ${str.num}">
+        <button class="string-listen-btn" title="Hear ${str.name || str.note} reference tone" aria-label="Play reference pitch for string ${str.num}" tabindex="0">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
             <polygon points="5 3 19 12 5 21 5 3"></polygon>
           </svg>
@@ -401,6 +404,15 @@ class GuitarTunerApp {
           return;
         }
         this.selectString(index);
+      });
+
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          if (e.target === card) {
+            e.preventDefault();
+            this.selectString(index);
+          }
+        }
       });
 
       this.dom.stringsContainer.appendChild(card);
@@ -526,6 +538,22 @@ class GuitarTunerApp {
     this.dom.modeGuitarBtn.addEventListener('click', () => this.setMode('guitar'));
     this.dom.modeChromaticBtn.addEventListener('click', () => this.setMode('chromatic'));
 
+    this.dom.modeGuitarBtn.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        this.setMode('chromatic');
+        this.dom.modeChromaticBtn.focus();
+      }
+    });
+
+    this.dom.modeChromaticBtn.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        this.setMode('guitar');
+        this.dom.modeGuitarBtn.focus();
+      }
+    });
+
     // Auto String Track Button
     this.dom.autoDetectStringBtn.addEventListener('click', () => {
       this.selectedStringIndex = null;
@@ -624,6 +652,7 @@ class GuitarTunerApp {
     // Global keyboard shortcuts
     window.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+      if (e.target.tagName === 'BUTTON' && e.target !== this.dom.micToggleBtn) return;
 
       if (e.code === 'Space') {
         e.preventDefault();

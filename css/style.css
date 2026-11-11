@@ -153,9 +153,10 @@ body {
 }
 
 .custom-select:focus-visible {
-  outline: none;
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
   border-color: var(--accent-cyan);
-  box-shadow: 0 0 0 2px var(--accent-cyan-glow);
+  box-shadow: 0 0 0 3px var(--accent-cyan-glow);
 }
 
 .custom-select.compact {
@@ -198,6 +199,12 @@ body {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
+.mode-btn:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 2px var(--accent-cyan-glow);
+}
+
 /* Buttons */
 .primary-btn {
   background: linear-gradient(135deg, #0284c7, #0ea5e9);
@@ -224,10 +231,21 @@ body {
   transform: translateY(0);
 }
 
+.primary-btn:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px var(--accent-cyan-glow);
+}
+
 .primary-btn.recording {
   background: linear-gradient(135deg, #e11d48, #f43f5e);
   box-shadow: 0 0 14px rgba(244, 63, 94, 0.5);
   animation: pulse-recording 2s infinite ease-in-out;
+}
+
+.primary-btn.recording:focus-visible {
+  outline: 2px solid #f43f5e;
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.4);
 }
 
 .mic-btn {
@@ -238,6 +256,76 @@ body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+.secondary-btn {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.secondary-btn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.secondary-btn:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px var(--accent-cyan-glow);
+}
+
+.icon-btn {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.icon-btn:hover {
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+  color: var(--text-primary);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 3px var(--accent-cyan-glow);
+}
+
+.icon-btn-compact:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+  color: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 3px var(--accent-cyan-glow);
+}
+
+.icon-btn-compact.delete:focus-visible {
+  outline: 2px solid var(--accent-rose);
+  outline-offset: 2px;
+  color: var(--accent-rose);
+  border-color: var(--accent-rose);
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.4);
 }
 
 @keyframes pulse-recording {
