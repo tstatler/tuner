@@ -17,7 +17,8 @@ A modern, high-precision web-based guitar and chromatic instrument tuner powered
 - **Instrument & Chromatic Modes**:
   - **Guitar Mode**: Auto-tracks closest string in selected tuning or allows manual target string locking.
   - **Chromatic Mode**: Displays all 12 semitones across any octave with exact frequency and cents offset.
-- **Comprehensive Tuning Presets**:
+- **Comprehensive & Custom Tunings**:
+  - **Custom Tuning Creator**: Create, name, preview, and save any custom tuning (4, 5, 6, 7, or 8 strings) saved to `localStorage` and listed under `⭐ Custom Tunings` at the top of the Tuning menu.
   - **Guitar (6-String)**: Standard (E A D G B E), Drop D, DADGAD, Open D, Open G, Half-Step Down (Eb), Full-Step Down (D), Drop C, Open E.
   - **Extended Range**: 7-String Standard (B E A D G B E).
   - **Bass**: 4-String Standard (E A D G), 5-String Standard (B E A D G).

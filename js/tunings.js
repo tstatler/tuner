@@ -173,6 +173,60 @@ export const TUNING_PRESETS = [
 ];
 
 /**
+ * Custom Tunings LocalStorage Persistence
+ */
+const STORAGE_KEY = 'guitar_tuner_custom_tunings';
+
+export function loadCustomTunings() {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    console.error('Error loading custom tunings:', e);
+    return [];
+  }
+}
+
+export function saveCustomTuning(tuning) {
+  if (typeof localStorage === 'undefined') return false;
+  try {
+    const existing = loadCustomTunings();
+    const index = existing.findIndex(t => t.id === tuning.id);
+    if (index >= 0) {
+      existing[index] = tuning;
+    } else {
+      existing.unshift(tuning);
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
+    return true;
+  } catch (e) {
+    console.error('Error saving custom tuning:', e);
+    return false;
+  }
+}
+
+export function deleteCustomTuning(tuningId) {
+  if (typeof localStorage === 'undefined') return false;
+  try {
+    const existing = loadCustomTunings();
+    const filtered = existing.filter(t => t.id !== tuningId);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+    return true;
+  } catch (e) {
+    console.error('Error deleting custom tuning:', e);
+    return false;
+  }
+}
+
+export function getAllTunings() {
+  const custom = loadCustomTunings();
+  return [...custom, ...TUNING_PRESETS];
+}
+
+/**
  * Returns MIDI note number for note name and octave (e.g. 'A', 4 -> 69)
  */
 export function getMidiNumber(noteName, octave) {

@@ -21,10 +21,24 @@
       </div>
 
       <div class="header-controls">
-        <!-- Tuning Selector -->
-        <div class="control-group">
+        <!-- Tuning Selector & Custom Tuning Actions -->
+        <div class="control-group tuning-control-group">
           <label for="tuningSelect" class="control-label">Tuning</label>
-          <select id="tuningSelect" class="custom-select" aria-label="Select instrument tuning"></select>
+          <div class="select-with-actions">
+            <select id="tuningSelect" class="custom-select" aria-label="Select instrument tuning"></select>
+            <button id="addCustomTuningBtn" class="icon-btn-compact" title="Create Custom Tuning" aria-label="Create Custom Tuning">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </button>
+            <button id="deleteCustomTuningBtn" class="icon-btn-compact delete hidden" title="Delete this custom tuning" aria-label="Delete this custom tuning">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <!-- Mode Toggle (Guitar vs Chromatic) -->
@@ -206,6 +220,55 @@
       <div class="dialog-footer">
         <button id="saveSettingsBtn" class="primary-btn">Done</button>
       </div>
+    </dialog>
+
+    <!-- Create Custom Tuning Dialog -->
+    <dialog id="customTuningDialog" class="settings-dialog custom-tuning-dialog" aria-labelledby="customTuningHeading">
+      <div class="dialog-header">
+        <h2 id="customTuningHeading" class="dialog-title">Create Custom Tuning</h2>
+        <button id="closeCustomTuningBtn" class="icon-btn close-btn" aria-label="Close Custom Tuning Dialog">✕</button>
+      </div>
+
+      <form id="customTuningForm">
+        <div class="dialog-body">
+          <div class="settings-group">
+            <label for="customTuningName" class="settings-label">Tuning Name</label>
+            <input type="text" id="customTuningName" class="custom-input" placeholder="e.g. Open C (C G C G C E)" required autocomplete="off">
+          </div>
+
+          <div class="dialog-grid-row">
+            <div class="settings-group">
+              <label for="customTuningTemplate" class="settings-label">Start From Preset</label>
+              <select id="customTuningTemplate" class="custom-select full-width"></select>
+            </div>
+            <div class="settings-group">
+              <label for="customStringCount" class="settings-label">Number of Strings</label>
+              <select id="customStringCount" class="custom-select full-width">
+                <option value="4">4 Strings (Bass / Ukulele)</option>
+                <option value="5">5 Strings (Bass / Banjo)</option>
+                <option value="6" selected>6 Strings (Guitar)</option>
+                <option value="7">7 Strings (7-String Guitar)</option>
+                <option value="8">8 Strings (8-String Guitar)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-group-header">
+              <span class="settings-label">String Notes (Low to High)</span>
+              <span class="subtle-label">Click 🔊 to hear pitch</span>
+            </div>
+            <div id="customStringsEditor" class="custom-strings-list">
+              <!-- Dynamically populated string rows -->
+            </div>
+          </div>
+        </div>
+
+        <div class="dialog-footer">
+          <button type="button" id="cancelCustomTuningBtn" class="secondary-btn">Cancel</button>
+          <button type="submit" id="saveCustomTuningBtn" class="primary-btn">Save & Use Tuning</button>
+        </div>
+      </form>
     </dialog>
   </div>
 

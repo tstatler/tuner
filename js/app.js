@@ -3,7 +3,18 @@
  * Connects Audio Controller, Pitch Detector, Canvas Gauge, Tunings, and UI Events
  */
 
-import { TUNING_PRESETS, getFrequency, frequencyToNote, findClosestString, calculateCents, NOTE_NAMES } from './tunings.js';
+import { 
+  TUNING_PRESETS, 
+  getFrequency, 
+  frequencyToNote, 
+  findClosestString, 
+  calculateCents, 
+  NOTE_NAMES,
+  loadCustomTunings,
+  saveCustomTuning,
+  deleteCustomTuning,
+  getAllTunings
+} from './tunings.js';
 import { PitchDetector } from './pitch-detector.js';
 import { AudioController } from './audio-controller.js';
 import { TunerGauge } from './gauge.js';
@@ -72,7 +83,19 @@ class GuitarTunerApp {
       sensitivitySlider: document.getElementById('sensitivitySlider'),
       sensitivityValueLabel: document.getElementById('sensitivityValueLabel'),
       audioDeviceSelect: document.getElementById('audioDeviceSelect'),
-      presetPills: document.querySelectorAll('.pill-btn')
+      presetPills: document.querySelectorAll('.pill-btn'),
+
+      // Custom Tuning Controls & Dialog
+      addCustomTuningBtn: document.getElementById('addCustomTuningBtn'),
+      deleteCustomTuningBtn: document.getElementById('deleteCustomTuningBtn'),
+      customTuningDialog: document.getElementById('customTuningDialog'),
+      customTuningForm: document.getElementById('customTuningForm'),
+      customTuningName: document.getElementById('customTuningName'),
+      customTuningTemplate: document.getElementById('customTuningTemplate'),
+      customStringCount: document.getElementById('customStringCount'),
+      customStringsEditor: document.getElementById('customStringsEditor'),
+      closeCustomTuningBtn: document.getElementById('closeCustomTuningBtn'),
+      cancelCustomTuningBtn: document.getElementById('cancelCustomTuningBtn')
     };
 
     // Gauge Instance
@@ -91,10 +114,25 @@ class GuitarTunerApp {
     this.startRenderLoop();
   }
 
-  populateTuningsDropdown() {
+  populateTuningsDropdown(selectedId = null) {
     this.dom.tuningSelect.innerHTML = '';
-    const categories = {};
+    const customTunings = loadCustomTunings();
 
+    // 1. Custom Tunings if any exist
+    if (customTunings.length > 0) {
+      const customGroup = document.createElement('optgroup');
+      customGroup.label = '⭐ Custom Tunings';
+      customTunings.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.name;
+        customGroup.appendChild(opt);
+      });
+      this.dom.tuningSelect.appendChild(customGroup);
+    }
+
+    // 2. Built-in Preset Categories
+    const categories = {};
     TUNING_PRESETS.forEach(tuning => {
       if (!categories[tuning.category]) {
         categories[tuning.category] = [];
@@ -112,6 +150,156 @@ class GuitarTunerApp {
         optGroup.appendChild(opt);
       });
       this.dom.tuningSelect.appendChild(optGroup);
+    }
+
+    const targetId = selectedId || (this.currentTuning ? this.currentTuning.id : 'standard');
+    this.dom.tuningSelect.value = targetId;
+    this.updateDeleteButtonVisibility();
+  }
+
+  updateDeleteButtonVisibility() {
+    if (this.currentTuning && this.currentTuning.isCustom) {
+      this.dom.deleteCustomTuningBtn.classList.remove('hidden');
+    } else {
+      this.dom.deleteCustomTuningBtn.classList.add('hidden');
+    }
+  }
+
+  openCustomTuningModal() {
+    // Populate template selector with built-in presets
+    this.dom.customTuningTemplate.innerHTML = '';
+    TUNING_PRESETS.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      this.dom.customTuningTemplate.appendChild(opt);
+    });
+
+    // Default field values
+    this.dom.customTuningName.value = '';
+    const currentLen = this.currentTuning.strings.length;
+    this.dom.customStringCount.value = [4, 5, 6, 7, 8].includes(currentLen) ? currentLen.toString() : '6';
+
+    // Render editor strings
+    this.renderCustomStringsEditor(this.currentTuning.strings);
+
+    this.dom.customTuningDialog.showModal();
+    this.dom.customTuningName.focus();
+  }
+
+  renderCustomStringsEditor(sourceStrings) {
+    const count = parseInt(this.dom.customStringCount.value, 10);
+    this.dom.customStringsEditor.innerHTML = '';
+
+    const strings = [];
+    for (let i = 0; i < count; i++) {
+      if (sourceStrings && sourceStrings[i]) {
+        strings.push({ ...sourceStrings[i], num: count - i });
+      } else {
+        strings.push({ num: count - i, note: 'E', octave: Math.min(5, 2 + Math.floor(i / 2)), name: `String ${count - i}` });
+      }
+    }
+
+    strings.forEach((str, idx) => {
+      const row = document.createElement('div');
+      row.className = 'custom-string-row';
+      row.dataset.index = idx;
+
+      const stringNum = count - idx;
+      const initialFreq = getFrequency(str.note, str.octave, this.a4Frequency);
+
+      const noteOptions = NOTE_NAMES.map(n => `<option value="${n}" ${n === str.note ? 'selected' : ''}>${n}</option>`).join('');
+      const octaveOptions = [0, 1, 2, 3, 4, 5, 6].map(o => `<option value="${o}" ${o === str.octave ? 'selected' : ''}>Octave ${o}</option>`).join('');
+
+      row.innerHTML = `
+        <span class="custom-string-label">String ${stringNum}</span>
+        <select class="custom-select compact string-note-input" aria-label="Note for String ${stringNum}">
+          ${noteOptions}
+        </select>
+        <select class="custom-select compact string-octave-input" aria-label="Octave for String ${stringNum}">
+          ${octaveOptions}
+        </select>
+        <span class="custom-string-freq">${initialFreq.toFixed(1)} Hz</span>
+        <button type="button" class="custom-string-tone-btn" title="Preview pitch" aria-label="Preview reference pitch for String ${stringNum}">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+        </button>
+      `;
+
+      const noteSelect = row.querySelector('.string-note-input');
+      const octaveSelect = row.querySelector('.string-octave-input');
+      const freqLabel = row.querySelector('.custom-string-freq');
+      const toneBtn = row.querySelector('.custom-string-tone-btn');
+
+      const updateRowFreq = () => {
+        const note = noteSelect.value;
+        const oct = parseInt(octSelect.value, 10);
+        const f = getFrequency(note, oct, this.a4Frequency);
+        freqLabel.textContent = `${f.toFixed(1)} Hz`;
+        return f;
+      };
+
+      noteSelect.addEventListener('change', updateRowFreq);
+      octaveSelect.addEventListener('change', updateRowFreq);
+
+      toneBtn.addEventListener('click', () => {
+        const f = updateRowFreq();
+        this.audioController.playReferenceTone(f, this.dom.toneTimbreSelect.value, 1.8);
+      });
+
+      this.dom.customStringsEditor.appendChild(row);
+    });
+  }
+
+  saveCustomTuningFromForm() {
+    const name = this.dom.customTuningName.value.trim();
+    if (!name) return;
+
+    const rows = this.dom.customStringsEditor.querySelectorAll('.custom-string-row');
+    const strings = [];
+    const count = rows.length;
+
+    rows.forEach((row, idx) => {
+      const noteSelect = row.querySelector('.string-note-input');
+      const octaveSelect = row.querySelector('.string-octave-input');
+      const note = noteSelect.value;
+      const octave = parseInt(octaveSelect.value, 10);
+      const num = count - idx;
+      strings.push({
+        num,
+        note,
+        octave,
+        name: `${note}${octave}`
+      });
+    });
+
+    const newTuning = {
+      id: `custom_${Date.now()}`,
+      category: '⭐ Custom Tunings',
+      name: name,
+      isCustom: true,
+      strings
+    };
+
+    saveCustomTuning(newTuning);
+    this.currentTuning = newTuning;
+    this.selectedStringIndex = null;
+    this.populateTuningsDropdown(newTuning.id);
+    this.renderStrings();
+    this.dom.customTuningDialog.close();
+    this.showStatus(`Saved custom tuning: ${name}`, 'info', 2500);
+  }
+
+  deleteCurrentCustomTuning() {
+    if (!this.currentTuning || !this.currentTuning.isCustom) return;
+    if (confirm(`Are you sure you want to delete custom tuning "${this.currentTuning.name}"?`)) {
+      deleteCustomTuning(this.currentTuning.id);
+      this.currentTuning = TUNING_PRESETS[0];
+      this.selectedStringIndex = null;
+      this.populateTuningsDropdown(this.currentTuning.id);
+      this.renderStrings();
+      this.showStatus('Custom tuning deleted', 'info', 2000);
     }
   }
 
@@ -223,13 +411,55 @@ class GuitarTunerApp {
   bindEvents() {
     // Tuning change
     this.dom.tuningSelect.addEventListener('change', (e) => {
-      const selected = TUNING_PRESETS.find(t => t.id === e.target.value);
+      const all = getAllTunings();
+      const selected = all.find(t => t.id === e.target.value);
       if (selected) {
         this.currentTuning = selected;
         this.selectedStringIndex = null;
         this.dom.autoDetectStringBtn.classList.add('active');
+        this.updateDeleteButtonVisibility();
         this.renderStrings();
       }
+    });
+
+    // Custom Tuning Buttons
+    this.dom.addCustomTuningBtn.addEventListener('click', () => {
+      this.openCustomTuningModal();
+    });
+
+    this.dom.deleteCustomTuningBtn.addEventListener('click', () => {
+      this.deleteCurrentCustomTuning();
+    });
+
+    this.dom.closeCustomTuningBtn.addEventListener('click', () => {
+      this.dom.customTuningDialog.close();
+    });
+
+    this.dom.cancelCustomTuningBtn.addEventListener('click', () => {
+      this.dom.customTuningDialog.close();
+    });
+
+    // Custom Tuning Template Preset Change
+    this.dom.customTuningTemplate.addEventListener('change', (e) => {
+      const preset = TUNING_PRESETS.find(p => p.id === e.target.value);
+      if (preset) {
+        this.dom.customStringCount.value = preset.strings.length.toString();
+        this.renderCustomStringsEditor(preset.strings);
+        if (!this.dom.customTuningName.value || this.dom.customTuningName.value.startsWith('Custom:')) {
+          this.dom.customTuningName.value = `Custom: ${preset.name.split(' (')[0]}`;
+        }
+      }
+    });
+
+    // Custom Tuning String Count Change
+    this.dom.customStringCount.addEventListener('change', () => {
+      this.renderCustomStringsEditor(this.currentTuning.strings);
+    });
+
+    // Custom Tuning Form Submission
+    this.dom.customTuningForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.saveCustomTuningFromForm();
     });
 
     // Mode Toggle
