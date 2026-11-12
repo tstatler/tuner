@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Guitar Tuner - Precision Web Audio Tuner</title>
   <meta name="description" content="Accurate, real-time guitar and chromatic instrument tuner with tone generator and alternate tunings using Web Audio API.">
   <link rel="stylesheet" href="css/style.css">
@@ -20,50 +20,54 @@
         </div>
       </div>
 
-      <div class="header-controls">
-        <!-- Tuning Selector & Custom Tuning Actions -->
-        <div class="control-group tuning-control-group">
-          <label for="tuningSelect" class="control-label">Tuning</label>
-          <div class="select-with-actions">
-            <select id="tuningSelect" class="custom-select" aria-label="Select instrument tuning" tabindex="0"></select>
-            <button id="addCustomTuningBtn" class="icon-btn-compact" title="Create Custom Tuning" aria-label="Create Custom Tuning" tabindex="0">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-            </button>
-            <button id="deleteCustomTuningBtn" class="icon-btn-compact delete hidden" title="Delete this custom tuning" aria-label="Delete this custom tuning" tabindex="0">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              </svg>
-            </button>
+      <!-- Header Controls & Actions Group -->
+      <div class="header-right-zone">
+        <div class="header-controls">
+          <!-- Tuning Selector & Custom Tuning Actions -->
+          <div class="control-group tuning-control-group">
+            <label for="tuningSelect" class="control-label">Tuning</label>
+            <div class="select-with-actions">
+              <select id="tuningSelect" class="custom-select" aria-label="Select instrument tuning" tabindex="0"></select>
+              <button id="addCustomTuningBtn" class="icon-btn-compact" title="Create Custom Tuning" aria-label="Create Custom Tuning" tabindex="0">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+              </button>
+              <button id="deleteCustomTuningBtn" class="icon-btn-compact delete hidden" title="Delete this custom tuning" aria-label="Delete this custom tuning" tabindex="0">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Mode Toggle (Guitar vs Chromatic) -->
+          <div class="mode-toggle-group" role="radiogroup" aria-label="Tuning Mode">
+            <button id="modeGuitarBtn" class="mode-btn active" role="radio" aria-checked="true" data-mode="guitar" tabindex="0">Guitar</button>
+            <button id="modeChromaticBtn" class="mode-btn" role="radio" aria-checked="false" data-mode="chromatic" tabindex="0">Chromatic</button>
           </div>
         </div>
 
-        <!-- Mode Toggle (Guitar vs Chromatic) -->
-        <div class="mode-toggle-group" role="radiogroup" aria-label="Tuning Mode">
-          <button id="modeGuitarBtn" class="mode-btn active" role="radio" aria-checked="true" data-mode="guitar" tabindex="0">Guitar</button>
-          <button id="modeChromaticBtn" class="mode-btn" role="radio" aria-checked="false" data-mode="chromatic" tabindex="0">Chromatic</button>
+        <!-- Settings & Mic Actions -->
+        <div class="header-actions">
+          <button id="openSettingsBtn" class="icon-btn" aria-label="Open Tuner Settings" title="Settings (Calibration & Audio)" tabindex="0">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
+
+          <button id="micToggleBtn" class="primary-btn mic-btn" aria-label="Turn Tuner On (Spacebar)" title="Turn Tuner On (Spacebar)" tabindex="0">
+            <svg class="mic-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="23"></line>
+              <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
+          </button>
         </div>
-
-        <!-- Settings Button -->
-        <button id="openSettingsBtn" class="icon-btn" aria-label="Open Tuner Settings" title="Settings (Calibration & Audio)" tabindex="0">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-        </button>
-
-        <!-- Mic Action Button -->
-        <button id="micToggleBtn" class="primary-btn mic-btn" aria-label="Turn Tuner On (Spacebar)" title="Turn Tuner On (Spacebar)" tabindex="0">
-          <svg class="mic-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-            <line x1="12" y1="19" x2="12" y2="23"></line>
-            <line x1="8" y1="23" x2="16" y2="23"></line>
-          </svg>
-        </button>
       </div>
     </header>
 
