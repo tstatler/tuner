@@ -11,7 +11,9 @@ export class AudioController {
     this.filterNode = null;
     this.analyserNode = null;
     this.visualizerAnalyser = null;
+    this.silentGainNode = null;
     this.timeBuffer = null;
+    this.byteTimeBuffer = null;
     this.freqBuffer = null;
     this.activeOscillators = [];
     this.activeGainNodes = [];
@@ -20,17 +22,64 @@ export class AudioController {
   }
 
   async initAudioContext() {
-    if (!this.audioContext) {
+    if (!this.audioContext || this.audioContext.state === 'closed') {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       this.audioContext = new AudioCtx();
+      this.audioContext.onstatechange = () => {
+        if (
+          this.isListening &&
+          this.audioContext &&
+          (this.audioContext.state === 'suspended' || this.audioContext.state === 'interrupted')
+        ) {
+          this.audioContext.resume().catch(() => {});
+        }
+      };
     }
-    if (this.audioContext.state === 'suspended') {
+    if (this.audioContext.state !== 'running') {
       await this.audioContext.resume();
     }
     return this.audioContext;
   }
 
+  async ensureRunning() {
+    if (this.audioContext && this.audioContext.state !== 'running' && this.audioContext.state !== 'closed') {
+      try {
+        await this.audioContext.resume();
+      } catch (e) {}
+    }
+  }
+
+  async _getMicrophoneStream(audioConstraints) {
+    try {
+      return await navigator.mediaDevices.getUserMedia({
+        audio: audioConstraints,
+        video: false
+      });
+    } catch (err) {
+      if (err && (err.name === 'OverconstrainedError' || err.name === 'TypeError')) {
+        // Retry without deviceId/channelCount constraints (common iOS WebKit quirk)
+        try {
+          return await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false
+            },
+            video: false
+          });
+        } catch (fallbackErr) {
+          if (fallbackErr && (fallbackErr.name === 'OverconstrainedError' || fallbackErr.name === 'TypeError')) {
+            return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          }
+          throw fallbackErr;
+        }
+      }
+      throw err;
+    }
+  }
+
   async startListening(deviceId = null) {
+    // Initialize & resume AudioContext synchronously inside the user gesture before awaiting getUserMedia
     await this.initAudioContext();
     if (deviceId) {
       this.selectedDeviceId = deviceId;
@@ -51,10 +100,11 @@ export class AudioController {
     }
 
     try {
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({
-        audio: audioConstraints,
-        video: false
-      });
+      this.mediaStream = await this._getMicrophoneStream(audioConstraints);
+
+      // On iOS Safari/Firefox (WebKit), the microphone permission prompt or AVAudioSession switch
+      // often transitions the AudioContext to 'suspended' or 'interrupted'. Resume it again here.
+      await this.ensureRunning();
 
       this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
 
@@ -64,10 +114,11 @@ export class AudioController {
       this.filterNode.frequency.setValueAtTime(950, this.audioContext.currentTime);
       this.filterNode.Q.setValueAtTime(1.0, this.audioContext.currentTime);
 
-      // Analyser for pitch detection (needs larger buffer, e.g. 2048 or 4096)
+      // Analyser for pitch detection (use 4096 at high sample rates > 48kHz so low notes fit)
       this.analyserNode = this.audioContext.createAnalyser();
-      this.analyserNode.fftSize = 2048;
+      this.analyserNode.fftSize = this.audioContext.sampleRate > 48000 ? 4096 : 2048;
       this.timeBuffer = new Float32Array(this.analyserNode.fftSize);
+      this.byteTimeBuffer = new Uint8Array(this.analyserNode.fftSize);
 
       // Analyser for real-time visualizer (waveform & spectrum)
       this.visualizerAnalyser = this.audioContext.createAnalyser();
@@ -75,12 +126,21 @@ export class AudioController {
       this.visualizerAnalyser.smoothingTimeConstant = 0.8;
       this.freqBuffer = new Uint8Array(this.visualizerAnalyser.frequencyBinCount);
 
+      // Silent gain sink connected to destination:
+      // Required on iOS Safari & iOS Firefox (WebKit) so the audio engine pulls frames through
+      // the MediaStreamSource -> Analyser graph without outputting mic feedback to speakers.
+      this.silentGainNode = this.audioContext.createGain();
+      this.silentGainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+
       // Connect graph:
-      // Mic Source -> Lowpass Filter -> Pitch Analyser
-      // Mic Source -> Visualizer Analyser
+      // Mic Source -> Lowpass Filter -> Pitch Analyser -> Silent Gain -> Destination
+      // Mic Source -> Visualizer Analyser -> Silent Gain -> Destination
       this.sourceNode.connect(this.filterNode);
       this.filterNode.connect(this.analyserNode);
+      this.analyserNode.connect(this.silentGainNode);
       this.sourceNode.connect(this.visualizerAnalyser);
+      this.visualizerAnalyser.connect(this.silentGainNode);
+      this.silentGainNode.connect(this.audioContext.destination);
 
       this.isListening = true;
       return true;
@@ -96,12 +156,25 @@ export class AudioController {
       this.mediaStream.getTracks().forEach(track => track.stop());
       this.mediaStream = null;
     }
-    if (this.sourceNode) {
-      try {
-        this.sourceNode.disconnect();
-      } catch (e) {}
-      this.sourceNode = null;
+    const nodes = [
+      this.sourceNode,
+      this.filterNode,
+      this.analyserNode,
+      this.visualizerAnalyser,
+      this.silentGainNode
+    ];
+    for (const node of nodes) {
+      if (node) {
+        try {
+          node.disconnect();
+        } catch (e) {}
+      }
     }
+    this.sourceNode = null;
+    this.filterNode = null;
+    this.analyserNode = null;
+    this.visualizerAnalyser = null;
+    this.silentGainNode = null;
     this.isListening = false;
   }
 
@@ -109,7 +182,17 @@ export class AudioController {
     if (!this.isListening || !this.analyserNode) {
       return null;
     }
-    this.analyserNode.getFloatTimeDomainData(this.timeBuffer);
+    if (this.audioContext && this.audioContext.state !== 'running' && this.audioContext.state !== 'closed') {
+      this.audioContext.resume().catch(() => {});
+    }
+    if (typeof this.analyserNode.getFloatTimeDomainData === 'function') {
+      this.analyserNode.getFloatTimeDomainData(this.timeBuffer);
+    } else {
+      this.analyserNode.getByteTimeDomainData(this.byteTimeBuffer);
+      for (let i = 0; i < this.byteTimeBuffer.length; i++) {
+        this.timeBuffer[i] = (this.byteTimeBuffer[i] - 128) / 128;
+      }
+    }
     return this.timeBuffer;
   }
 

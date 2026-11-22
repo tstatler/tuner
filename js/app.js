@@ -642,10 +642,18 @@ class GuitarTunerApp {
       if (this.isListening) {
         try {
           await this.audioController.startListening(e.target.value);
+          this.pitchDetector.setSampleRate(this.audioController.getSampleRate());
           this.showStatus('Switched audio input device', 'info', 2000);
         } catch (err) {
           this.showStatus('Failed to switch audio input device', 'error', 4000);
         }
+      }
+    });
+
+    // Resume AudioContext if tab returns to foreground on iOS
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && this.isListening) {
+        this.audioController.ensureRunning();
       }
     });
 
@@ -704,13 +712,13 @@ class GuitarTunerApp {
 
   updateSensitivityFromSlider() {
     const val = parseInt(this.dom.sensitivitySlider.value, 10);
-    // 1: High Sensitivity (0.005) -> 5: High Noise Filter (0.04)
+    // 1: High Sensitivity (0.003) -> 5: High Noise Filter (0.035)
     const map = {
-      1: { rms: 0.005, label: 'Highest' },
-      2: { rms: 0.010, label: 'High' },
-      3: { rms: 0.015, label: 'Normal' },
-      4: { rms: 0.025, label: 'Filtered' },
-      5: { rms: 0.040, label: 'Maximum Noise Gate' }
+      1: { rms: 0.003, label: 'Highest' },
+      2: { rms: 0.006, label: 'High' },
+      3: { rms: 0.010, label: 'Normal' },
+      4: { rms: 0.020, label: 'Filtered' },
+      5: { rms: 0.035, label: 'Maximum Noise Gate' }
     };
     const setting = map[val] || map[3];
     this.dom.sensitivityValueLabel.textContent = setting.label;
