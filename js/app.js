@@ -34,6 +34,11 @@ class GuitarTunerApp {
     this.animFrameId = null;
     this.lastPitchTimestamp = 0;
     this.activeNoteDisplayTimeout = null;
+    this.noiseStartTimestamp = 0;
+    this.noiseAlertDismissed = false;
+    this.noiseAlertVisible = false;
+    this.noiseAlertThresholdMs = 2500;
+    this.lastSensitivityLevel = 3;
 
     // DOM Elements
     this.dom = {
@@ -113,7 +118,8 @@ class GuitarTunerApp {
     this.populateToneGeneratorNotes();
     this.renderStrings();
     this.bindEvents();
-    this.updateSensitivityFromSlider();
+    this.loadSavedSensitivity();
+    this.updateSensitivityFromSlider(false);
     this.startRenderLoop();
   }
 
@@ -710,19 +716,45 @@ class GuitarTunerApp {
     this.populateToneGeneratorNotes();
   }
 
-  updateSensitivityFromSlider() {
+  loadSavedSensitivity() {
+    try {
+      const saved = localStorage.getItem('tuner_sensitivity');
+      if (saved && ['1', '2', '3', '4', '5'].includes(saved)) {
+        this.dom.sensitivitySlider.value = saved;
+      }
+    } catch (e) {}
+  }
+
+  updateSensitivityFromSlider(persist = true) {
     const val = parseInt(this.dom.sensitivitySlider.value, 10);
-    // 1: High Sensitivity (0.003) -> 5: High Noise Filter (0.035)
+    // 1: Highest Sensitivity (0.0015) -> 5: Maximum Noise Gate (0.028)
     const map = {
-      1: { rms: 0.003, label: 'Highest' },
-      2: { rms: 0.006, label: 'High' },
-      3: { rms: 0.010, label: 'Normal' },
-      4: { rms: 0.020, label: 'Filtered' },
-      5: { rms: 0.035, label: 'Maximum Noise Gate' }
+      1: { rms: 0.0015, label: 'Highest' },
+      2: { rms: 0.0025, label: 'High' },
+      3: { rms: 0.004, label: 'Normal' },
+      4: { rms: 0.012, label: 'Filtered' },
+      5: { rms: 0.028, label: 'Maximum Noise Gate' }
     };
     const setting = map[val] || map[3];
     this.dom.sensitivityValueLabel.textContent = setting.label;
     this.pitchDetector.setSensitivity(setting.rms);
+
+    if (persist) {
+      try {
+        localStorage.setItem('tuner_sensitivity', String(val));
+      } catch (e) {}
+
+      this.noiseStartTimestamp = 0;
+      if (val > this.lastSensitivityLevel || val >= 5) {
+        if (this.noiseAlertVisible) {
+          this.hideStatus();
+        }
+      } else if (val < this.lastSensitivityLevel) {
+        // Re-enable background noise alert if the user lowered the noise gate
+        this.noiseAlertDismissed = false;
+      }
+    }
+    this.lastSensitivityLevel = val;
   }
 
   async populateAudioDevices() {
@@ -758,6 +790,10 @@ class GuitarTunerApp {
       this.dom.signalLevelText.textContent = 'Inactive';
       this.gauge.setCents(0, false);
       this.highlightStringCards(null, false);
+      this.noiseStartTimestamp = 0;
+      if (this.noiseAlertVisible) {
+        this.hideStatus();
+      }
     } else {
       try {
         await this.audioController.startListening();
@@ -782,6 +818,7 @@ class GuitarTunerApp {
   }
 
   showStatus(msg, type = 'info', autoHideMs = 0) {
+    this.noiseAlertVisible = false;
     this.dom.statusBanner.textContent = msg;
     this.dom.statusBanner.className = `status-banner ${type}`;
     if (autoHideMs > 0) {
@@ -789,7 +826,40 @@ class GuitarTunerApp {
     }
   }
 
+  showBackgroundNoiseAlert() {
+    this.noiseAlertVisible = true;
+    this.dom.statusBanner.className = 'status-banner warning';
+    this.dom.statusBanner.innerHTML = `
+      <span>High background noise detected — try raising the Noise Gate in Settings.</span>
+      <div class="status-banner-actions">
+        <button type="button" class="status-banner-btn" id="noiseAdjustBtn">Adjust</button>
+        <button type="button" class="status-banner-dismiss" id="noiseDismissBtn" aria-label="Dismiss noise alert">✕</button>
+      </div>
+    `;
+
+    const adjustBtn = this.dom.statusBanner.querySelector('#noiseAdjustBtn');
+    const dismissBtn = this.dom.statusBanner.querySelector('#noiseDismissBtn');
+
+    if (adjustBtn) {
+      adjustBtn.addEventListener('click', () => {
+        this.noiseAlertDismissed = true;
+        this.hideStatus();
+        this.populateAudioDevices();
+        this.dom.settingsDialog.showModal();
+        this.dom.sensitivitySlider.focus();
+      });
+    }
+
+    if (dismissBtn) {
+      dismissBtn.addEventListener('click', () => {
+        this.noiseAlertDismissed = true;
+        this.hideStatus();
+      });
+    }
+  }
+
   hideStatus() {
+    this.noiseAlertVisible = false;
     this.dom.statusBanner.className = 'status-banner hidden';
   }
 
@@ -815,13 +885,34 @@ class GuitarTunerApp {
     if (!audioData) return;
 
     const result = this.pitchDetector.detectPitch(audioData);
+    const now = performance.now();
 
     if (result.frequency > 0) {
-      this.lastPitchTimestamp = performance.now();
+      this.lastPitchTimestamp = now;
+      this.noiseStartTimestamp = 0;
+      if (this.noiseAlertVisible) {
+        this.hideStatus();
+      }
       this.handlePitchDetected(result.frequency, result.rms);
     } else {
-      // Fade back to listening if silent for more than 400ms
-      if (performance.now() - this.lastPitchTimestamp > 450) {
+      // Detect sustained background noise: signal exceeds RMS gate but has no clear musical pitch
+      if (result.rms >= this.pitchDetector.sensitivity) {
+        if (!this.noiseStartTimestamp) {
+          this.noiseStartTimestamp = now;
+        } else if (
+          now - this.noiseStartTimestamp >= this.noiseAlertThresholdMs &&
+          !this.noiseAlertDismissed &&
+          !this.noiseAlertVisible &&
+          parseInt(this.dom.sensitivitySlider.value, 10) < 5
+        ) {
+          this.showBackgroundNoiseAlert();
+        }
+      } else {
+        this.noiseStartTimestamp = 0;
+      }
+
+      // Fade back to listening if silent for more than 450ms
+      if (now - this.lastPitchTimestamp > 450) {
         this.handlePitchDecayed();
       }
     }

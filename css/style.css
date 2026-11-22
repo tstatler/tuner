@@ -442,6 +442,52 @@ body {
   color: #bae6fd;
 }
 
+.status-banner.warning {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fde68a;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.status-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+.status-banner-btn {
+  background: rgba(245, 158, 11, 0.25);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  color: #fef3c7;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.status-banner-btn:hover {
+  background: rgba(245, 158, 11, 0.4);
+}
+
+.status-banner-dismiss {
+  background: transparent;
+  border: none;
+  color: #fde68a;
+  font-size: 0.9rem;
+  padding: 0.15rem 0.4rem;
+  cursor: pointer;
+  opacity: 0.75;
+  line-height: 1;
+}
+
+.status-banner-dismiss:hover {
+  opacity: 1;
+}
+
 /* Main Display Card */
 .display-card {
   background: var(--bg-card);

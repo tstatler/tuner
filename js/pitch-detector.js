@@ -9,8 +9,8 @@ export class PitchDetector {
     this.sampleRate = sampleRate;
     this.minFreq = 55;   // ~A1 (supports bass & drop tunings)
     this.maxFreq = 1100; // ~C6 (supports high harmonics and fretboard range)
-    this.clarityThreshold = 0.82; // Normalized autocorrelation peak threshold
-    this.sensitivity = 0.015;     // RMS noise gate threshold
+    this.clarityThreshold = 0.76; // Normalized autocorrelation peak threshold
+    this.sensitivity = 0.004;     // RMS noise gate threshold
     
     // History buffer for stability smoothing
     this.pitchHistory = [];
@@ -22,8 +22,8 @@ export class PitchDetector {
   }
 
   setSensitivity(val) {
-    // val between 0.005 (very sensitive) and 0.08 (high noise gate)
-    this.sensitivity = Math.max(0.002, Math.min(0.1, val));
+    // val between 0.001 (very sensitive) and 0.1 (high noise gate)
+    this.sensitivity = Math.max(0.001, Math.min(0.1, val));
   }
 
   /**
@@ -77,7 +77,7 @@ export class PitchDetector {
       }
 
       const norm = Math.sqrt(norm1 * norm2);
-      correlation[lag] = norm > 1e-6 ? sum / norm : 0;
+      correlation[lag] = norm > 1e-9 ? sum / norm : 0;
     }
 
     // 1. Identify all local maxima within valid period range

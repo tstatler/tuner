@@ -35,6 +35,9 @@ function createMockAudioEnvironment({
     }
   }
 
+  let filterCount = 0;
+  let createdFilters = [];
+
   class MockAudioContext {
     constructor() {
       this.sampleRate = sampleRate;
@@ -52,10 +55,12 @@ function createMockAudioEnvironment({
       return new MockNode('source');
     }
     createBiquadFilter() {
-      const node = new MockNode('filter');
+      const node = new MockNode(filterCount === 0 ? 'highpass' : 'lowpass');
+      filterCount++;
       node.type = '';
-      node.frequency = { setValueAtTime() {} };
-      node.Q = { setValueAtTime() {} };
+      node.frequency = { setValueAtTime(v) { node._freq = v; } };
+      node.Q = { setValueAtTime(v) { node._q = v; } };
+      createdFilters.push(node);
       return node;
     }
     createAnalyser() {
@@ -114,6 +119,7 @@ function createMockAudioEnvironment({
 
   return {
     connections,
+    createdFilters,
     getResumeCalls: () => resumeCalls,
     getLastGainValue: () => lastGainValue,
     getContext: () => createdContext,
@@ -136,6 +142,15 @@ async function runTests() {
     assert(
       env.connections.some(([from, to]) => from === 'silentGain' && to === 'destination'),
       'Silent GainNode connects to AudioContext.destination so WebKit pulls audio frames'
+    );
+    assert(
+      env.connections.some(([from, to]) => from === 'source' && to === 'highpass') &&
+      env.connections.some(([from, to]) => from === 'highpass' && to === 'lowpass'),
+      '50 Hz high-pass filter is chained before low-pass filter to remove DC/rumble'
+    );
+    assert(
+      env.createdFilters[0].type === 'highpass' && env.createdFilters[0]._freq === 50,
+      'High-pass filter is configured at 50 Hz'
     );
     assert(
       env.connections.some(([from, to]) => from === 'analyser' && to === 'silentGain'),
@@ -182,18 +197,35 @@ async function runTests() {
     ctrl.stopListening();
   }
 
-  // Test 5: PitchDetector accuracy at iOS 48000 Hz with 2048-sample buffer
+  // Test 5: PitchDetector accuracy on quiet pluck at iOS 48000 Hz with default sensitivity
   {
     const detector = new PitchDetector(48000);
-    detector.setSensitivity(0.01);
     const e2 = 82.41;
     const buf = new Float32Array(2048);
     for (let i = 0; i < buf.length; i++) {
-      buf[i] = 0.5 * Math.sin(2 * Math.PI * e2 * (i / 48000));
+      // Quiet pluck (amplitude 0.008 -> RMS ~0.0056)
+      buf[i] = 0.008 * Math.sin(2 * Math.PI * e2 * (i / 48000));
     }
     const res = detector.detectPitch(buf);
     const diffCents = Math.abs(1200 * Math.log2(res.frequency / e2));
-    assert(res.frequency > 0 && diffCents < 2.0, `Detects E2 (82.41 Hz) at 48kHz/2048 buffer (got ${res.frequency.toFixed(2)} Hz)`);
+    assert(res.frequency > 0 && diffCents < 2.0, `Detects quiet E2 pluck (amp 0.008) at 48kHz/2048 with default sensitivity (got ${res.frequency.toFixed(2)} Hz)`);
+  }
+
+  // Test 6: Background noise crosses RMS gate but returns frequency === -1 (triggers noise alert condition)
+  {
+    const detector = new PitchDetector(48000);
+    const noiseBuf = new Float32Array(2048);
+    // Deterministic pseudo-random noise with RMS ~0.03 (well above default 0.004 gate)
+    let seed = 12345;
+    for (let i = 0; i < noiseBuf.length; i++) {
+      seed = (seed * 16807) % 2147483647;
+      noiseBuf[i] = ((seed / 2147483647) * 2 - 1) * 0.05;
+    }
+    const res = detector.detectPitch(noiseBuf);
+    assert(
+      res.rms >= detector.sensitivity && res.frequency === -1,
+      `Loud aperiodic background noise crosses RMS gate (rms=${res.rms.toFixed(4)}) without false pitch detection`
+    );
   }
 
   console.log('\nAll AudioController iOS compatibility tests passed!');

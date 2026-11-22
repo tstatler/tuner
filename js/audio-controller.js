@@ -8,6 +8,7 @@ export class AudioController {
     this.audioContext = null;
     this.mediaStream = null;
     this.sourceNode = null;
+    this.highpassNode = null;
     this.filterNode = null;
     this.analyserNode = null;
     this.visualizerAnalyser = null;
@@ -108,6 +109,12 @@ export class AudioController {
 
       this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
 
+      // High-pass filter to strip DC offset, handling thumps, and sub-50Hz room rumble
+      this.highpassNode = this.audioContext.createBiquadFilter();
+      this.highpassNode.type = 'highpass';
+      this.highpassNode.frequency.setValueAtTime(50, this.audioContext.currentTime);
+      this.highpassNode.Q.setValueAtTime(0.707, this.audioContext.currentTime);
+
       // Low-pass filter to clean up high-frequency noise and harmonics for guitar fundamentals
       this.filterNode = this.audioContext.createBiquadFilter();
       this.filterNode.type = 'lowpass';
@@ -133,9 +140,10 @@ export class AudioController {
       this.silentGainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
 
       // Connect graph:
-      // Mic Source -> Lowpass Filter -> Pitch Analyser -> Silent Gain -> Destination
+      // Mic Source -> Highpass (50Hz) -> Lowpass (950Hz) -> Pitch Analyser -> Silent Gain -> Destination
       // Mic Source -> Visualizer Analyser -> Silent Gain -> Destination
-      this.sourceNode.connect(this.filterNode);
+      this.sourceNode.connect(this.highpassNode);
+      this.highpassNode.connect(this.filterNode);
       this.filterNode.connect(this.analyserNode);
       this.analyserNode.connect(this.silentGainNode);
       this.sourceNode.connect(this.visualizerAnalyser);
@@ -158,6 +166,7 @@ export class AudioController {
     }
     const nodes = [
       this.sourceNode,
+      this.highpassNode,
       this.filterNode,
       this.analyserNode,
       this.visualizerAnalyser,
@@ -171,6 +180,7 @@ export class AudioController {
       }
     }
     this.sourceNode = null;
+    this.highpassNode = null;
     this.filterNode = null;
     this.analyserNode = null;
     this.visualizerAnalyser = null;
