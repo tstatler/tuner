@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "python3 -m http.server 8080",
-    "test": "node test/tuner-math.test.js && node test/custom-tunings.test.js && node test/audio-controller.test.js"
+    "test": "node test/tuner-math.test.js && node test/custom-tunings.test.js && node test/audio-controller.test.js && node test/inactivity-monitor.test.js && node test/metronome.test.js"
   },
   "keywords": [
     "guitar",

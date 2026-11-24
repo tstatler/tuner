@@ -440,6 +440,22 @@ body {
   background: rgba(56, 189, 248, 0.15);
   border: 1px solid rgba(56, 189, 248, 0.3);
   color: #bae6fd;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.status-banner.info .status-banner-btn {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #e0f2fe;
+}
+
+.status-banner.info .status-banner-btn:hover {
+  background: rgba(56, 189, 248, 0.38);
+}
+
+.status-banner.info .status-banner-dismiss {
+  color: #bae6fd;
 }
 
 .status-banner.warning {
@@ -838,6 +854,170 @@ body {
 
 .hidden {
   display: none !important;
+}
+
+/* Metronome Section */
+.metronome-section {
+  width: 100%;
+}
+
+.metronome-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 0.85rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.metronome-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.metronome-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.metronome-bpm-badge {
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 0.18rem 0.55rem;
+  border-radius: var(--radius-full);
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: var(--accent-cyan);
+}
+
+.metronome-beats {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.beat-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  transition: transform 0.08s ease, background-color 0.08s ease, box-shadow 0.08s ease;
+}
+
+.beat-dot.accent {
+  width: 12px;
+  height: 12px;
+  border-color: rgba(52, 211, 153, 0.45);
+}
+
+.beat-dot.active {
+  background: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
+  transform: scale(1.25);
+}
+
+.beat-dot.accent.active {
+  background: var(--accent-emerald);
+  border-color: var(--accent-emerald);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.9);
+  transform: scale(1.3);
+}
+
+.metronome-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.metronome-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 76px;
+  justify-content: center;
+}
+
+.metronome-toggle-btn.playing {
+  background: rgba(244, 63, 94, 0.2);
+  border-color: rgba(244, 63, 94, 0.45);
+  color: #fda4af;
+}
+
+.metronome-collapse-btn svg {
+  transition: transform var(--transition-fast);
+}
+
+.metronome-collapse-btn[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.metronome-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.metronome-body.collapsed {
+  display: none;
+}
+
+.metronome-bpm-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.metronome-bpm-slider {
+  flex: 1;
+}
+
+.metronome-step-btn {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 32px;
+  min-height: 32px;
+}
+
+.metronome-tap-btn {
+  padding: 0.35rem 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.metronome-tap-btn.tapped {
+  background: rgba(56, 189, 248, 0.25);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+.metronome-options-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.metronome-volume-wrap {
+  flex: 1;
+  min-width: 140px;
+}
+
+.metronome-volume-slider {
+  flex: 1;
+  min-width: 80px;
 }
 
 /* Visualizer Section */
@@ -1472,6 +1652,26 @@ body {
     min-width: 110px;
     justify-content: center;
     padding: 0.45rem 0.75rem;
+  }
+
+  /* Metronome Card */
+  .metronome-card {
+    padding: 0.65rem 0.75rem;
+    border-radius: var(--radius-md);
+    gap: 0.6rem;
+  }
+
+  .metronome-header {
+    gap: 0.45rem;
+  }
+
+  .metronome-options-row {
+    gap: 0.45rem;
+  }
+
+  .metronome-volume-wrap {
+    width: 100%;
+    flex-basis: 100%;
   }
 
   /* Signal Visualizer */

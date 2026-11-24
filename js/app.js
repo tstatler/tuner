@@ -19,6 +19,8 @@ import {
 import { PitchDetector } from './pitch-detector.js';
 import { AudioController } from './audio-controller.js';
 import { TunerGauge } from './gauge.js';
+import { InactivityMonitor, DEFAULT_AUTO_OFF_MS, ALLOWED_AUTO_OFF_MS } from './inactivity-monitor.js';
+import { Metronome, TIME_SIGNATURES } from './metronome.js';
 
 class GuitarTunerApp {
   constructor() {
@@ -39,6 +41,17 @@ class GuitarTunerApp {
     this.noiseAlertVisible = false;
     this.noiseAlertThresholdMs = 2500;
     this.lastSensitivityLevel = 3;
+    this.autoOffTimeoutMs = DEFAULT_AUTO_OFF_MS;
+    this.metronomeBeatClearTimeout = null;
+
+    this.inactivityMonitor = new InactivityMonitor({
+      timeoutMs: this.autoOffTimeoutMs,
+      onTimeout: () => this.stopMicrophone({ autoDisabled: true })
+    });
+
+    this.metronome = new Metronome(this.audioController, {
+      onBeat: (beatIndex, isAccent) => this.highlightMetronomeBeat(beatIndex, isAccent)
+    });
 
     // DOM Elements
     this.dom = {
@@ -78,6 +91,21 @@ class GuitarTunerApp {
       // Visualizer
       signalLevelText: document.getElementById('signalLevelText'),
 
+      // Metronome
+      metronomeBpmBadge: document.getElementById('metronomeBpmBadge'),
+      metronomeBeats: document.getElementById('metronomeBeats'),
+      metronomeToggleBtn: document.getElementById('metronomeToggleBtn'),
+      metronomeToggleLabel: document.getElementById('metronomeToggleLabel'),
+      metronomeCollapseBtn: document.getElementById('metronomeCollapseBtn'),
+      metronomeBody: document.getElementById('metronomeBody'),
+      metronomeBpmDown: document.getElementById('metronomeBpmDown'),
+      metronomeBpmSlider: document.getElementById('metronomeBpmSlider'),
+      metronomeBpmUp: document.getElementById('metronomeBpmUp'),
+      metronomeTapBtn: document.getElementById('metronomeTapBtn'),
+      metronomeTimeSig: document.getElementById('metronomeTimeSig'),
+      metronomeSound: document.getElementById('metronomeSound'),
+      metronomeVolume: document.getElementById('metronomeVolume'),
+
       // Settings Dialog
       settingsDialog: document.getElementById('settingsDialog'),
       openSettingsBtn: document.getElementById('openSettingsBtn'),
@@ -87,6 +115,7 @@ class GuitarTunerApp {
       a4ValueLabel: document.getElementById('a4ValueLabel'),
       sensitivitySlider: document.getElementById('sensitivitySlider'),
       sensitivityValueLabel: document.getElementById('sensitivityValueLabel'),
+      autoOffSelect: document.getElementById('autoOffSelect'),
       audioDeviceSelect: document.getElementById('audioDeviceSelect'),
       presetPills: document.querySelectorAll('.pill-btn'),
 
@@ -119,6 +148,9 @@ class GuitarTunerApp {
     this.renderStrings();
     this.bindEvents();
     this.loadSavedSensitivity();
+    this.loadSavedAutoOff();
+    this.loadSavedMetronomeSettings();
+    this.renderMetronomeBeats();
     this.updateSensitivityFromSlider(false);
     this.startRenderLoop();
   }
@@ -643,6 +675,16 @@ class GuitarTunerApp {
       this.updateSensitivityFromSlider();
     });
 
+    // Auto-Off Inactivity Timeout Select
+    if (this.dom.autoOffSelect) {
+      this.dom.autoOffSelect.addEventListener('change', (e) => {
+        this.setAutoOffTimeout(parseInt(e.target.value, 10));
+      });
+    }
+
+    // Metronome Controls
+    this.bindMetronomeEvents();
+
     // Device switch
     this.dom.audioDeviceSelect.addEventListener('change', async (e) => {
       if (this.isListening) {
@@ -656,10 +698,19 @@ class GuitarTunerApp {
       }
     });
 
-    // Resume AudioContext if tab returns to foreground on iOS
+    // Resume AudioContext if tab returns to foreground on iOS,
+    // and check if mic inactivity timeout already expired during background/sleep.
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && this.isListening) {
-        this.audioController.ensureRunning();
+      if (!document.hidden) {
+        if (this.isListening) {
+          const expired = this.inactivityMonitor.checkNow();
+          if (!expired) {
+            this.audioController.ensureRunning();
+          }
+        }
+        if (this.metronome.isPlaying) {
+          this.audioController.ensureRunning();
+        }
       }
     });
 
@@ -725,6 +776,193 @@ class GuitarTunerApp {
     } catch (e) {}
   }
 
+  loadSavedAutoOff() {
+    let ms = DEFAULT_AUTO_OFF_MS;
+    try {
+      const saved = localStorage.getItem('tuner_auto_off_ms');
+      if (saved !== null) {
+        const parsed = parseInt(saved, 10);
+        if (ALLOWED_AUTO_OFF_MS.includes(parsed)) {
+          ms = parsed;
+        }
+      }
+    } catch (e) {}
+
+    this.autoOffTimeoutMs = ms;
+    this.inactivityMonitor.setTimeoutMs(ms);
+    if (this.dom.autoOffSelect) {
+      this.dom.autoOffSelect.value = String(ms);
+    }
+  }
+
+  setAutoOffTimeout(ms) {
+    if (!ALLOWED_AUTO_OFF_MS.includes(ms)) return;
+    this.autoOffTimeoutMs = ms;
+    this.inactivityMonitor.setTimeoutMs(ms);
+    try {
+      localStorage.setItem('tuner_auto_off_ms', String(ms));
+    } catch (e) {}
+  }
+
+  // --- Metronome Methods ---
+
+  loadSavedMetronomeSettings() {
+    let collapsed = true;
+    try {
+      const raw = localStorage.getItem('tuner_metronome_settings');
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (typeof saved.bpm === 'number') this.metronome.setBpm(saved.bpm);
+        if (typeof saved.timeSignature === 'string') this.metronome.setTimeSignature(saved.timeSignature);
+        if (typeof saved.sound === 'string') this.metronome.setSound(saved.sound);
+        if (typeof saved.volume === 'number') this.metronome.setVolume(saved.volume);
+        if (typeof saved.collapsed === 'boolean') collapsed = saved.collapsed;
+      }
+    } catch (e) {}
+
+    this.syncMetronomeUI();
+    this.setMetronomeCollapsed(collapsed, false);
+  }
+
+  saveMetronomeSettings() {
+    try {
+      const collapsed = this.dom.metronomeBody.classList.contains('collapsed');
+      localStorage.setItem('tuner_metronome_settings', JSON.stringify({
+        bpm: this.metronome.bpm,
+        timeSignature: this.metronome.timeSignature,
+        sound: this.metronome.sound,
+        volume: this.metronome.volume,
+        collapsed
+      }));
+    } catch (e) {}
+  }
+
+  syncMetronomeUI() {
+    if (!this.dom.metronomeBpmBadge) return;
+    this.dom.metronomeBpmBadge.textContent = `${this.metronome.bpm} BPM`;
+    this.dom.metronomeBpmSlider.value = String(this.metronome.bpm);
+    this.dom.metronomeTimeSig.value = this.metronome.timeSignature;
+    this.dom.metronomeSound.value = this.metronome.sound;
+    this.dom.metronomeVolume.value = String(Math.round(this.metronome.volume * 100));
+  }
+
+  setMetronomeCollapsed(collapsed, persist = true) {
+    if (!this.dom.metronomeBody || !this.dom.metronomeCollapseBtn) return;
+    this.dom.metronomeBody.classList.toggle('collapsed', collapsed);
+    this.dom.metronomeCollapseBtn.setAttribute('aria-expanded', String(!collapsed));
+    if (persist) {
+      this.saveMetronomeSettings();
+    }
+  }
+
+  renderMetronomeBeats() {
+    if (!this.dom.metronomeBeats) return;
+    const count = TIME_SIGNATURES[this.metronome.timeSignature] || 4;
+    this.dom.metronomeBeats.innerHTML = '';
+    for (let i = 0; i < count; i++) {
+      const dot = document.createElement('span');
+      dot.className = i === 0 ? 'beat-dot accent' : 'beat-dot';
+      dot.dataset.beat = String(i);
+      this.dom.metronomeBeats.appendChild(dot);
+    }
+  }
+
+  highlightMetronomeBeat(beatIndex) {
+    if (!this.dom.metronomeBeats) return;
+    const dots = this.dom.metronomeBeats.querySelectorAll('.beat-dot');
+    dots.forEach((dot, idx) => {
+      dot.classList.toggle('active', idx === beatIndex);
+    });
+
+    if (this.metronomeBeatClearTimeout) {
+      clearTimeout(this.metronomeBeatClearTimeout);
+    }
+    const pulseMs = Math.min(180, Math.max(60, (60000 / this.metronome.bpm) * 0.45));
+    this.metronomeBeatClearTimeout = setTimeout(() => {
+      dots.forEach(dot => dot.classList.remove('active'));
+      this.metronomeBeatClearTimeout = null;
+    }, pulseMs);
+  }
+
+  updateMetronomeToggleUI(playing) {
+    if (!this.dom.metronomeToggleBtn) return;
+    this.dom.metronomeToggleBtn.classList.toggle('playing', playing);
+    this.dom.metronomeToggleBtn.setAttribute('aria-label', playing ? 'Stop Metronome' : 'Start Metronome');
+    this.dom.metronomeToggleLabel.textContent = playing ? 'Stop' : 'Start';
+    const playIcon = this.dom.metronomeToggleBtn.querySelector('.metronome-play-icon');
+    const stopIcon = this.dom.metronomeToggleBtn.querySelector('.metronome-stop-icon');
+    if (playIcon) playIcon.classList.toggle('hidden', playing);
+    if (stopIcon) stopIcon.classList.toggle('hidden', !playing);
+    if (!playing && this.dom.metronomeBeats) {
+      this.dom.metronomeBeats.querySelectorAll('.beat-dot').forEach(d => d.classList.remove('active'));
+    }
+  }
+
+  bindMetronomeEvents() {
+    if (!this.dom.metronomeToggleBtn) return;
+
+    this.dom.metronomeToggleBtn.addEventListener('click', async () => {
+      try {
+        const playing = await this.metronome.toggle();
+        this.updateMetronomeToggleUI(playing);
+      } catch (err) {
+        console.error('Error toggling metronome:', err);
+        this.updateMetronomeToggleUI(false);
+      }
+    });
+
+    this.dom.metronomeCollapseBtn.addEventListener('click', () => {
+      const isCollapsed = this.dom.metronomeBody.classList.contains('collapsed');
+      this.setMetronomeCollapsed(!isCollapsed, true);
+    });
+
+    this.dom.metronomeBpmSlider.addEventListener('input', (e) => {
+      this.metronome.setBpm(parseInt(e.target.value, 10));
+      this.syncMetronomeUI();
+      this.saveMetronomeSettings();
+    });
+
+    this.dom.metronomeBpmDown.addEventListener('click', (e) => {
+      const step = e.shiftKey ? 5 : 1;
+      this.metronome.setBpm(this.metronome.bpm - step);
+      this.syncMetronomeUI();
+      this.saveMetronomeSettings();
+    });
+
+    this.dom.metronomeBpmUp.addEventListener('click', (e) => {
+      const step = e.shiftKey ? 5 : 1;
+      this.metronome.setBpm(this.metronome.bpm + step);
+      this.syncMetronomeUI();
+      this.saveMetronomeSettings();
+    });
+
+    this.dom.metronomeTapBtn.addEventListener('click', () => {
+      this.dom.metronomeTapBtn.classList.add('tapped');
+      setTimeout(() => this.dom.metronomeTapBtn.classList.remove('tapped'), 120);
+      const bpm = this.metronome.recordTap();
+      if (bpm !== null) {
+        this.syncMetronomeUI();
+        this.saveMetronomeSettings();
+      }
+    });
+
+    this.dom.metronomeTimeSig.addEventListener('change', (e) => {
+      this.metronome.setTimeSignature(e.target.value);
+      this.renderMetronomeBeats();
+      this.saveMetronomeSettings();
+    });
+
+    this.dom.metronomeSound.addEventListener('change', (e) => {
+      this.metronome.setSound(e.target.value);
+      this.saveMetronomeSettings();
+    });
+
+    this.dom.metronomeVolume.addEventListener('input', (e) => {
+      this.metronome.setVolume(parseInt(e.target.value, 10) / 100);
+      this.saveMetronomeSettings();
+    });
+  }
+
   updateSensitivityFromSlider(persist = true) {
     const val = parseInt(this.dom.sensitivitySlider.value, 10);
     // 1: Highest Sensitivity (0.0015) -> 5: Maximum Noise Gate (0.028)
@@ -778,27 +1016,36 @@ class GuitarTunerApp {
     });
   }
 
+  stopMicrophone({ autoDisabled = false } = {}) {
+    this.inactivityMonitor.stop();
+    this.audioController.stopListening();
+    this.isListening = false;
+    this.dom.micToggleBtn.classList.remove('recording');
+    this.dom.micToggleBtn.title = 'Turn Tuner On (Spacebar)';
+    this.dom.micToggleBtn.setAttribute('aria-label', 'Turn Tuner On (Spacebar)');
+    this.dom.tuningStatusTag.className = 'tuning-status-tag idle';
+    this.dom.tuningStatusTag.textContent = 'Microphone Off';
+    this.dom.signalLevelText.textContent = 'Inactive';
+    this.gauge.setCents(0, false);
+    this.highlightStringCards(null, false);
+    this.noiseStartTimestamp = 0;
+
+    if (autoDisabled) {
+      this.showAutoOffBanner();
+    } else if (this.noiseAlertVisible) {
+      this.hideStatus();
+    }
+  }
+
   async toggleMicrophone() {
     if (this.isListening) {
-      this.audioController.stopListening();
-      this.isListening = false;
-      this.dom.micToggleBtn.classList.remove('recording');
-      this.dom.micToggleBtn.title = 'Turn Tuner On (Spacebar)';
-      this.dom.micToggleBtn.setAttribute('aria-label', 'Turn Tuner On (Spacebar)');
-      this.dom.tuningStatusTag.className = 'tuning-status-tag idle';
-      this.dom.tuningStatusTag.textContent = 'Microphone Off';
-      this.dom.signalLevelText.textContent = 'Inactive';
-      this.gauge.setCents(0, false);
-      this.highlightStringCards(null, false);
-      this.noiseStartTimestamp = 0;
-      if (this.noiseAlertVisible) {
-        this.hideStatus();
-      }
+      this.stopMicrophone({ autoDisabled: false });
     } else {
       try {
         await this.audioController.startListening();
         this.pitchDetector.setSampleRate(this.audioController.getSampleRate());
         this.isListening = true;
+        this.inactivityMonitor.start();
         this.dom.micToggleBtn.classList.add('recording');
         this.dom.micToggleBtn.title = 'Turn Tuner Off (Spacebar)';
         this.dom.micToggleBtn.setAttribute('aria-label', 'Turn Tuner Off (Spacebar)');
@@ -814,6 +1061,37 @@ class GuitarTunerApp {
         }
         this.showStatus(msg, 'error');
       }
+    }
+  }
+
+  showAutoOffBanner() {
+    const minutes = Math.max(1, Math.round(this.autoOffTimeoutMs / 60000));
+    const unit = minutes === 1 ? 'minute' : 'minutes';
+    this.noiseAlertVisible = false;
+    this.dom.statusBanner.className = 'status-banner info';
+    this.dom.statusBanner.innerHTML = `
+      <span>Microphone turned off automatically after ${minutes} ${unit} of inactivity.</span>
+      <div class="status-banner-actions">
+        <button type="button" class="status-banner-btn" id="autoOffResumeBtn">Turn On</button>
+        <button type="button" class="status-banner-dismiss" id="autoOffDismissBtn" aria-label="Dismiss auto-off notice">✕</button>
+      </div>
+    `;
+
+    const resumeBtn = this.dom.statusBanner.querySelector('#autoOffResumeBtn');
+    const dismissBtn = this.dom.statusBanner.querySelector('#autoOffDismissBtn');
+
+    if (resumeBtn) {
+      resumeBtn.addEventListener('click', () => {
+        if (!this.isListening) {
+          this.toggleMicrophone();
+        }
+      });
+    }
+
+    if (dismissBtn) {
+      dismissBtn.addEventListener('click', () => {
+        this.hideStatus();
+      });
     }
   }
 
@@ -890,6 +1168,7 @@ class GuitarTunerApp {
     if (result.frequency > 0) {
       this.lastPitchTimestamp = now;
       this.noiseStartTimestamp = 0;
+      this.inactivityMonitor.recordActivity();
       if (this.noiseAlertVisible) {
         this.hideStatus();
       }

@@ -6,7 +6,10 @@
   <title>Guitar Tuner - Precision Web Audio Tuner</title>
   <meta name="description" content="Accurate, real-time guitar and chromatic instrument tuner with tone generator and alternate tunings using Web Audio API.">
   <link rel="stylesheet" href="css/style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22%20width=%22100%22%20height=%22100%22><text y=%22.9em%22 font-size=%2290%22>🎸</text></svg>">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="icon" type="image/svg+xml" href="icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
 </head>
 <body>
   <div class="app-container">
@@ -162,6 +165,73 @@
         </div>
       </section>
 
+      <!-- Metronome Section -->
+      <section class="metronome-section" aria-label="Metronome">
+        <div class="metronome-card">
+          <div class="metronome-header">
+            <div class="metronome-title-wrap">
+              <span class="tone-icon" aria-hidden="true">🥁</span>
+              <span class="tone-title">Metronome</span>
+              <span id="metronomeBpmBadge" class="metronome-bpm-badge">120 BPM</span>
+            </div>
+
+            <div id="metronomeBeats" class="metronome-beats" aria-label="Beat indicator"></div>
+
+            <div class="metronome-header-actions">
+              <button id="metronomeToggleBtn" type="button" class="secondary-btn metronome-toggle-btn" aria-label="Start Metronome">
+                <svg class="metronome-play-icon" width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                <svg class="metronome-stop-icon hidden" width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="6" width="12" height="12"></rect>
+                </svg>
+                <span id="metronomeToggleLabel">Start</span>
+              </button>
+              <button id="metronomeCollapseBtn" type="button" class="icon-btn-compact metronome-collapse-btn" aria-expanded="false" aria-controls="metronomeBody" title="Expand or collapse metronome controls" aria-label="Toggle metronome controls">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div id="metronomeBody" class="metronome-body collapsed">
+            <!-- Tempo Controls Row -->
+            <div class="metronome-bpm-row">
+              <button id="metronomeBpmDown" type="button" class="icon-btn-compact metronome-step-btn" title="Decrease BPM (Shift+Click for -5)" aria-label="Decrease BPM">−</button>
+              <input type="range" id="metronomeBpmSlider" min="30" max="240" step="1" value="120" class="custom-slider metronome-bpm-slider" aria-label="Tempo in BPM">
+              <button id="metronomeBpmUp" type="button" class="icon-btn-compact metronome-step-btn" title="Increase BPM (Shift+Click for +5)" aria-label="Increase BPM">+</button>
+              <button id="metronomeTapBtn" type="button" class="secondary-btn metronome-tap-btn" title="Tap repeatedly to set tempo">Tap</button>
+            </div>
+
+            <!-- Options Row -->
+            <div class="metronome-options-row">
+              <div class="tone-control-item">
+                <label for="metronomeTimeSig" class="subtle-label">Time:</label>
+                <select id="metronomeTimeSig" class="custom-select compact" aria-label="Time signature">
+                  <option value="2/4">2/4</option>
+                  <option value="3/4">3/4</option>
+                  <option value="4/4" selected>4/4</option>
+                  <option value="6/8">6/8</option>
+                </select>
+              </div>
+              <div class="tone-control-item">
+                <label for="metronomeSound" class="subtle-label">Sound:</label>
+                <select id="metronomeSound" class="custom-select compact" aria-label="Metronome click sound">
+                  <option value="woodblock" selected>Woodblock</option>
+                  <option value="digital">Digital</option>
+                  <option value="soft">Soft</option>
+                </select>
+              </div>
+              <div class="tone-control-item metronome-volume-wrap">
+                <label for="metronomeVolume" class="subtle-label">Vol:</label>
+                <input type="range" id="metronomeVolume" min="0" max="100" step="1" value="70" class="custom-slider metronome-volume-slider" aria-label="Metronome volume">
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Bottom Audio Signal Visualizer -->
       <section class="visualizer-section" aria-label="Microphone Signal Waveform">
         <div class="visualizer-header">
@@ -210,6 +280,19 @@
             <span>Normal</span>
             <span>High Noise Filter</span>
           </div>
+        </div>
+
+        <!-- Auto-Off Inactivity Timeout -->
+        <div class="settings-group">
+          <label for="autoOffSelect" class="settings-label">Microphone Auto-Off Timeout</label>
+          <p class="settings-description">Automatically turns off the microphone if no musical pitch is detected for this duration, saving battery and preventing accidental background listening.</p>
+          <select id="autoOffSelect" class="custom-select full-width">
+            <option value="60000">1 minute</option>
+            <option value="120000" selected>2 minutes (Default)</option>
+            <option value="300000">5 minutes</option>
+            <option value="600000">10 minutes</option>
+            <option value="0">Off (Stay on)</option>
+          </select>
         </div>
 
         <!-- Input Device Selection -->
